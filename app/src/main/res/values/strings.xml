@@ -1,0 +1,33 @@
+<resources>
+    <string name="app_name">InventoryApp</string>
+    <string name="detail_activity_new_item">New Item</string>
+    <string name="detail_activity_edit_item">Item Details</string>
+    <string name="item_name">Item Name</string>
+    <string name="item_sold"> - Mark Item Sold</string>
+    <string name="new_shipment"> + New Shipment</string>
+    <string name="need_to_add_items">You have no items to track. Please click the button below to get started</string>
+    <string name="add_item">Add New Item</string>
+    <string name="mark_sale">Item Sold</string>
+
+
+    <string name="insert_quantity">Insert Quantity</string>
+    <string name="item_price">Item Price</string>
+    <string name="insert">Insert Item</string>
+    <string name="place_order">Order More</string>
+    <string name="delete">Delete</string>
+
+    <string name="insert_item_failed">Failed to insert item</string>
+    <string name="insert_item_success">Item successfully added</string>
+    <string name="update_item_failed">Item failed to update</string>
+    <string name="update_item_success">Item successfully updated</string>
+    <string name="delete_item_failed">Failed to delete item</string>
+    <string name="delete_item_success">Item deleted successfully</string>
+    <string name="need_info">Please make sure you have inserted valid values for all fields</string>
+    <string name="invalid_input">Please make sure that you have entered valid numbers for "Quantity" and "Price" </string>
+
+    <string name="save_item">Save</string>
+    <string name="in_stock">%1$s left in stock</string>
+    <string name="dollar_sign">Price: $%1$s</string>
+    <string name="delete_message">Are you sure you want to delete this item?</string>
+    <string name="cancel">Cancel</string>
+</resources>
