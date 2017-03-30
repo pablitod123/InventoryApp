@@ -1,10 +1,18 @@
 package com.example.android.inventoryapp;
 
+import android.content.ContentValues;
 import android.content.Context;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.util.Log;
 
 import com.example.android.inventoryapp.InventoryContract.InventoryEntry;
+
+import java.io.File;
+import java.io.FileOutputStream;
 
 /**
  * Created by paulstyslinger on 3/26/17.
@@ -17,6 +25,8 @@ public class InventoryDbHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "inventory.db";
 
     private static final int DATABASE_VERSION = 1;
+
+    private Context mContext;
 
     public InventoryDbHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -39,4 +49,7 @@ public class InventoryDbHelper extends SQLiteOpenHelper {
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         //Not Applicable to this app, for now
     }
+
 }
+
+

@@ -4,16 +4,19 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ContentUris;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.CursorLoader;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.Image;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.ParcelFileDescriptor;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
@@ -43,7 +46,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
+import static android.R.attr.id;
+import static android.os.Environment.getExternalStorageDirectory;
 import static com.example.android.inventoryapp.R.id.choose_image;
 import static com.example.android.inventoryapp.R.id.deleteButton;
 import static com.example.android.inventoryapp.R.id.image;
@@ -88,19 +95,12 @@ public class DetailActivity extends AppCompatActivity implements LoaderManager.L
      */
     private int mCurrentQuantity;
 
-    private Uri mImageUri;
-
-    private Bitmap mBitmap;
-
-    private boolean isGalleryPicture = false;
-
     private ImageView mImageView;
 
-    private String uriImageString;
+    private String mCurrentPhotoPath;
 
-    private static int LOAD_IMAGE_ID = 1;
+    private static int REQUEST_TAKE_PHOTO = 1;
 
-    private static final String FILE_PROVIDER_AUTHORITY = "com.example.android.inventoryapp";
 
     //Other TextViews
     private TextView mQuantText;
@@ -126,7 +126,6 @@ public class DetailActivity extends AppCompatActivity implements LoaderManager.L
         mQuantInsertText = (TextView) findViewById(R.id.text_item_quant_insert);
 
         mImageView = (ImageView) findViewById(R.id.image_view);
-
 
         Button orderButton = (Button) findViewById(R.id.orderButton);
         orderButton.setOnClickListener(new View.OnClickListener() {
@@ -182,10 +181,7 @@ public class DetailActivity extends AppCompatActivity implements LoaderManager.L
         imageButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                //Intent galleryIntent = new Intent(Intent.ACTION_PICK,
-                  //      android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-                //startActivityForResult(galleryIntent, LOAD_IMAGE_ID);
-                getImageFromGallery();
+                dispatchTakePictureIntent();
             }
         });
 
@@ -210,7 +206,6 @@ public class DetailActivity extends AppCompatActivity implements LoaderManager.L
             orderButton.setVisibility(View.GONE);
             mQuantCounterText.setVisibility(View.GONE);
             mQuantText.setVisibility(View.GONE);
-            mImageView.setVisibility(View.GONE);
 
         } else {
             //It's an item that's been clicked
@@ -246,17 +241,11 @@ public class DetailActivity extends AppCompatActivity implements LoaderManager.L
             return;
         }
 
-        if (uriImageString.isEmpty()) {
-            Toast.makeText(this, getString(R.string.invalid_input),
-                    Toast.LENGTH_SHORT).show();
-            return;
-        }
-
         ContentValues values = new ContentValues();
         values.put(InventoryEntry.COLUMN_ITEM_NAME, nameString);
         values.put(InventoryEntry.COLUMN_ITEM_PRICE, priceString);
         values.put(InventoryEntry.COLUMN_ITEM_QUANT, quantInsertString);
-        values.put(InventoryEntry.COLUMN_ITEM_PHOTO, uriImageString);
+        values.put(InventoryEntry.COLUMN_ITEM_PHOTO, mCurrentPhotoPath);
 
         if (mCurrentItemUri == null) {
             // New item
@@ -290,13 +279,6 @@ public class DetailActivity extends AppCompatActivity implements LoaderManager.L
 
         //exit the DetailActivity
         finish();
-    }
-
-    private void getImageFromGallery() {
-        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-
-        intent.setType("image/*");
-        startActivityForResult(Intent.createChooser(intent, "Select Picture"), LOAD_IMAGE_ID);
     }
 
 
@@ -336,13 +318,7 @@ public class DetailActivity extends AppCompatActivity implements LoaderManager.L
             String name = cursor.getString(nameColumnIndex);
             int quant = cursor.getInt(quantColumnIndex);
             int price = cursor.getInt(priceColumnIndex);
-
-            String imageString = cursor.getString(imageColumnIndex);
-            Uri imageUri = Uri.parse(imageString);
-            Bitmap bitmap = getBitmapFromUri(imageUri);
-            ImageView imageView = (ImageView) findViewById(R.id.image_view);
-            imageView.setImageBitmap(bitmap);
-
+            String image = cursor.getString(imageColumnIndex);
 
             // Update the views
             mNameEditText.setText(name);
@@ -350,7 +326,9 @@ public class DetailActivity extends AppCompatActivity implements LoaderManager.L
             mPriceEditText.setText(Integer.toString(price));
             mQuantCounterText.setText(Integer.toString(quant));
             mCurrentQuantity = quant;
-            cursor.close();
+            mCurrentPhotoPath =image;
+            loadImage();
+                    cursor.close();
         }
     }
 
@@ -437,111 +415,79 @@ public class DetailActivity extends AppCompatActivity implements LoaderManager.L
     }
 
 
+    //This is the beginning of the logic having to do with taking and storing pictures
     @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent resultData) {
-
-        if (requestCode == LOAD_IMAGE_ID && resultCode == Activity.RESULT_OK) {
-
-            if (resultData != null) {
-                mImageUri = resultData.getData();
-                Log.e("DetailsActivity", "LOOK: " + mImageUri.toString());
-                mBitmap = getBitmapFromUri(mImageUri);
-                mImageView.setImageBitmap(mBitmap);
-                uriImageString = getShareableImageUri().toString();
-                isGalleryPicture = true;
-            }
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_TAKE_PHOTO && resultCode == RESULT_OK) {
+            loadImage();
         }
     }
 
-
-    private Bitmap getBitmapFromUri(Uri uri) {
-        ParcelFileDescriptor parcelFileDescriptor = null;
-        try {
-            parcelFileDescriptor =
-                    getContentResolver().openFileDescriptor(uri, "r");
-            FileDescriptor fileDescriptor = null;
-            if (parcelFileDescriptor != null) {
-                fileDescriptor = parcelFileDescriptor.getFileDescriptor();
-            }
-            Bitmap image = BitmapFactory.decodeFileDescriptor(fileDescriptor);
-            if (parcelFileDescriptor != null) {
-                parcelFileDescriptor.close();
-            }
-            return image;
-        } catch (Exception e) {
-            return null;
-        } finally {
+    private void dispatchTakePictureIntent() {
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        // Ensure that there's a camera activity to handle the intent
+        if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+            // Create the File where the photo should go
+            File photoFile = null;
             try {
-                if (parcelFileDescriptor != null) {
-                    parcelFileDescriptor.close();
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
+                photoFile = createImageFile();
+            } catch (IOException ex) {
+                Log.e("MainActivity", "Error occurred while creating image file");
             }
-        }
-    }
+            // Continue only if the File was successfully created
+            if (photoFile != null) {
+                Uri photoURI = FileProvider.getUriForFile(this,
+                        "com.example.android.fileprovider",
+                        photoFile);
+                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
 
-    public Uri getShareableImageUri() {
-        Uri imageUri;
-
-        if (isGalleryPicture) {
-            String filename = getFilePath();
-            saveBitmapToFile(getCacheDir(), filename, mBitmap, Bitmap.CompressFormat.JPEG, 100);
-            File imageFile = new File(getCacheDir(), filename);
-
-            imageUri = FileProvider.getUriForFile(
-                    this, FILE_PROVIDER_AUTHORITY, imageFile);
-
-        } else {
-            imageUri = mImageUri;
-        }
-
-        return imageUri;
-    }
-
-    public String getFilePath() {
-        Cursor returnCursor =
-                getContentResolver().query(mImageUri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null);
-
-        if (returnCursor != null) {
-            returnCursor.moveToFirst();
-        }
-        String fileName = null;
-        if (returnCursor != null) {
-            fileName = returnCursor.getString(returnCursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
-        }
-        if (returnCursor != null) {
-            returnCursor.close();
-        }
-        return fileName;
-    }
-
-
-    public boolean saveBitmapToFile(File dir, String fileName, Bitmap bm,
-                                    Bitmap.CompressFormat format, int quality) {
-        File imageFile = new File(dir, fileName);
-
-        FileOutputStream fos = null;
-        try {
-            fos = new FileOutputStream(imageFile);
-            bm.compress(format, quality, fos);
-            fos.close();
-
-            return true;
-        } catch (IOException e) {
-            if (fos != null) {
-                try {
-                    fos.close();
-                } catch (IOException e1) {
-                    e1.printStackTrace();
-                }
+                startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO);
             }
+
         }
-
-        return false;
-
     }
 
+    private File createImageFile() throws IOException {
+        // Create an image file name
+
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        String imageFileName = "JPEG_" + timeStamp + "_";
+        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+
+        File image = File.createTempFile(
+                imageFileName,  /* prefix */
+                ".jpg",         /* suffix */
+                storageDir      /* directory */
+        );
+
+        // Save a file: path for use with ACTION_VIEW intents
+        mCurrentPhotoPath = image.getAbsolutePath();
+        return image;
+    }
+
+    private void loadImage() {
+        // Get the dimensions of the View
+        int targetW = mImageView.getWidth();
+        int targetH = mImageView.getHeight();
+
+        // Get the dimensions of the bitmap
+        BitmapFactory.Options bmOptions = new BitmapFactory.Options();
+        bmOptions.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(mCurrentPhotoPath, bmOptions);
+        int photoW = bmOptions.outWidth;
+        int photoH = bmOptions.outHeight;
+
+        Log.e("targetW", Integer.toString(targetW));
+        Log.e("targetH", Integer.toString(targetH));
+
+        // Decode the image file into a Bitmap sized to fill the View
+        bmOptions.inJustDecodeBounds = false;
+
+        bmOptions.inPurgeable = true;
+
+        Bitmap bitmap = BitmapFactory.decodeFile(mCurrentPhotoPath, bmOptions);
+        mImageView.setImageBitmap(bitmap);
+    }
 
 
 }
