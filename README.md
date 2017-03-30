@@ -1,6 +1,5 @@
 # InventoryApp
-Project #10 of the Udacity Nanodegree. The app uses a CursorLoader and SQLite database to track inventory 
-of items that can be added, deleted, read, and updated. 
+Project #10 of the Udacity Android Basics Nanodegree. The app uses a CursorLoader and SQLite database to track an inventory of products. Items appear in a ListView after being created and CRUD database actions are used to manage item data. 
 
 ## Concepts Covered:
 * Content Providers 
